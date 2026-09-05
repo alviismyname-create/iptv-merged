@@ -152,63 +152,28 @@ for extinf, url in dom9_channels:
 print(f"✅ dom9: Added {len(dom9_kept)} channels (all in 'dom9' group)")
 
 # ------------------------------------------------------------
-# STEP 4: Download English International Playlist (NO FILTERING)
+# STEP 4: Download WizakorHD - NO FILTERING (keep all channels)
 # ------------------------------------------------------------
-english_intl_url = "https://raw.githubusercontent.com/wizakorhd/iptv/main/playlist-english-intl.m3u"
-english_intl_channels = download_playlist(english_intl_url)
-english_intl_kept = []
+wiz_url = "https://raw.githubusercontent.com/wizakorhd/iptv/main/playlist.m3u"
+wiz_channels = download_playlist(wiz_url)
+wiz_kept = []
 
-for extinf, url in english_intl_channels:
+for extinf, url in wiz_channels:
+    # Keep all channels, ensure they have a group-title
     extinf_new = extinf
     if 'group-title="' not in extinf_new:
         if 'tvg-logo="' in extinf_new:
             extinf_new = extinf_new.replace('tvg-logo="', 'tvg-logo="" group-title="Uncategorized"', 1)
         else:
             extinf_new = extinf_new.replace('#EXTINF:', '#EXTINF: group-title="Uncategorized"', 1)
-    english_intl_kept.append((extinf_new, url))
+    wiz_kept.append((extinf_new, url))
 
-print(f"✅ English International: Added {len(english_intl_kept)} channels (no filtering)")
-
-# ------------------------------------------------------------
-# STEP 5: Download English India Playlist (NO FILTERING)  ← 🆕 NEW
-# ------------------------------------------------------------
-english_india_url = "https://raw.githubusercontent.com/wizakorhd/iptv/main/playlist-english-india.m3u"
-english_india_channels = download_playlist(english_india_url)
-english_india_kept = []
-
-for extinf, url in english_india_channels:
-    extinf_new = extinf
-    if 'group-title="' not in extinf_new:
-        if 'tvg-logo="' in extinf_new:
-            extinf_new = extinf_new.replace('tvg-logo="', 'tvg-logo="" group-title="Uncategorized"', 1)
-        else:
-            extinf_new = extinf_new.replace('#EXTINF:', '#EXTINF: group-title="Uncategorized"', 1)
-    english_india_kept.append((extinf_new, url))
-
-print(f"✅ English India: Added {len(english_india_kept)} channels (no filtering)")
+print(f"✅ WizakorHD: Added {len(wiz_kept)} channels (no filtering)")
 
 # ------------------------------------------------------------
-# STEP 6: Download freecasthub (NO filtering)
+# STEP 5: Merge and write final output.m3u
 # ------------------------------------------------------------
-free_url = "https://raw.githubusercontent.com/freecasthub/public-iptv/main/playlist.m3u"
-free_channels = download_playlist(free_url)
-free_kept = []
-
-for extinf, url in free_channels:
-    extinf_new = extinf
-    if 'group-title="' not in extinf_new:
-        if 'tvg-logo="' in extinf_new:
-            extinf_new = extinf_new.replace('tvg-logo="', 'tvg-logo="" group-title="Uncategorized"', 1)
-        else:
-            extinf_new = extinf_new.replace('#EXTINF:', '#EXTINF: group-title="Uncategorized"', 1)
-    free_kept.append((extinf_new, url))
-
-print(f"✅ freecasthub: Added {len(free_kept)} channels (untouched)")
-
-# ------------------------------------------------------------
-# STEP 7: Merge and write final output.m3u
-# ------------------------------------------------------------
-all_final = malayalam_kept + tamil_kept + dom9_kept + english_intl_kept + english_india_kept + free_kept
+all_final = malayalam_kept + tamil_kept + dom9_kept + wiz_kept
 
 with open("output.m3u", "w", encoding="utf-8") as f:
     f.write("#EXTM3U\n")
@@ -220,6 +185,4 @@ print(f"\n✅ FINAL: {len(all_final)} total channels in output.m3u")
 print(f"   🟢 Malayalam (filtered): {len(malayalam_kept)}")
 print(f"   🔴 Tamil (filtered): {len(tamil_kept)}")
 print(f"   🟠 dom9 (all channels): {len(dom9_kept)}")
-print(f"   🟡 English International (no filtering): {len(english_intl_kept)}")
-print(f"   🟢 English India (no filtering): {len(english_india_kept)}")
-print(f"   ⚪ freecasthub (untouched): {len(free_kept)}")
+print(f"   🟡 WizakorHD (no filtering): {len(wiz_kept)}")
