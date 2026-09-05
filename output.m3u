@@ -437,7 +437,7 @@ https://airtelapp.shemaroo.com/shemarootv/smil:shemarootvadp.smil/playlist.m3u8
 https://airtelapp.shemaroo.com/shemarooumang/smil:shemarooumangadp.smil/playlist.m3u8
 #EXTINF:-1 tvg-id="SonyEntertainmentTelevision.in" tvg-chno="54" tvg-logo="https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_SET/images/LOGO_HD/image.png" group-title="Hindi - Entertainment (26)" resolution="fhd",Sony Entertainment Television ᶠᴴᴰ
 http://38.96.178.205/SONYHD/index.m3u8
-#EXTINF:-1 tvg-id="StarPlus.in" tvg-chno="55" tvg-logo="https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_STAR_PLUS/images/LOGO_HD/image.png" group-title="Hindi - Entertainment (26)",StarPlus
+#EXTINF: group-title="Hindi"-1 tvg-id="StarPlus.in" tvg-chno="55" tvg-logo="https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_STAR_PLUS/images/LOGO_HD/image.png" ,StarPlus
 http://202.70.146.135:8000/play/a009/index.m3u8
 #EXTINF:-1 tvg-id="ZeeComedyNation.in" tvg-chno="56" tvg-logo="https://tvpnlogopus.samsungcloud.tv/platform/image/sourcelogo/vc/00/02/34/IN2100002GD_20260325T012327SQUARE.png" group-title="Hindi - Entertainment (26)" resolution="fhd",Zee Comedy Nation ᶠᴴᴰ
 https://amg00862-amg00862c5-amgplt0173.playout.now3.amagi.tv/playlist/amg00862-amg00862c5-amgplt0173/playlist.m3u8
@@ -563,15 +563,15 @@ https://mumt05.tangotv.in/87NeALx2UNIQUETV/index.m3u8
 https://yuppparoriglin.akamaized.net/181224/smil:wowkidzhindi.smil/playlist.m3u8?hdnts=st=1735898689~exp=1835898688~acl=*~hmac=f5fe24724fe05481e3841f9eb5ab8efdee0a3dd83645ae9dcf45703f525bab7b
 #EXTINF:-1 tvg-id="AndTV.in" tvg-chno="117" tvg-logo="https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_SYMANDTV/images/LOGO_HD/LOGO_HD_image.png" group-title="Hindi - Movies (20)" resolution="fhd" subs="1",&TV ᶠᴴᴰ
 https://3f56f997.wurl.com/master/f36d25e7e52f1ba8d7e56eb859c636563214f541/U2Ftc3VuZy1nYl9BbmRUVl9ITFM/playlist.m3u8
-#EXTINF:-1 tvg-id="B4UKadak.in" tvg-chno="118" tvg-logo="https://ltsk-cdn.s3.eu-west-1.amazonaws.com/jumpstart/Temp_Live/cdn/HLS/Channel/transparentImages/B4U-Kadak-BLACK-transparent.png" group-title="Hindi - Movies (20)" resolution="sd",B4U Kadak
+#EXTINF: group-title="Hindi"-1 tvg-id="B4UKadak.in" tvg-chno="118" tvg-logo="https://ltsk-cdn.s3.eu-west-1.amazonaws.com/jumpstart/Temp_Live/cdn/HLS/Channel/transparentImages/B4U-Kadak-BLACK-transparent.png" resolution="sd",B4U Kadak
 https://streams.tangotv.in/B4UKADAK/ORIGIN/index.m3u8
-#EXTINF:-1 tvg-id="B4UMovies.in" tvg-chno="119" tvg-logo="https://jiotvimages.cdn.jio.com/dare_images/images/b4u_movies.png" group-title="Hindi - Movies (20)" resolution="sd",B4U Movies
+#EXTINF: group-title="Hindi"-1 tvg-id="B4UMovies.in" tvg-chno="119" tvg-logo="https://jiotvimages.cdn.jio.com/dare_images/images/b4u_movies.png" resolution="sd",B4U Movies
 https://streams.tangotv.in/B4UMOVIES/ORIGIN/index.m3u8
 #EXTINF:-1 tvg-id="BollywoodHD.ro" tvg-chno="121" tvg-logo="https://i.imgur.com/scDKOLS.png" group-title="Hindi - Movies (20)" resolution="fhd",Bollywood HD
 https://xykt-fix.github.io/cinerama_edge01/hls/BOLLYWOOD_RU/Movie009.m3u8
 #EXTINF:-1 tvg-id="IN460001727" tvg-chno="122" tvg-logo="https://tvpnlogopus.samsungcloud.tv/platform/image/sourcelogo/vc/00/02/34/IN460001727_20260805T003945SQUARE.png" group-title="Hindi - Movies (20)" resolution="fhd",Dishoom Films
 https://jmp2.uk/stvp-IN460001727
-#EXTINF:-1 tvg-id="Goldmines.in" tvg-chno="123" tvg-logo="https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_GOLDMINES/images/LOGO_HD/image.png" group-title="Hindi - Movies (20)" resolution="sd",Goldmines
+#EXTINF: group-title="Hindi"-1 tvg-id="Goldmines.in" tvg-chno="123" tvg-logo="https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_GOLDMINES/images/LOGO_HD/image.png" resolution="sd",Goldmines
 https://streams.tangotv.in/GOLDMINES/ORIGIN/index.m3u8
 #EXTINF:-1 tvg-id="GoldminesBollywood.in" tvg-chno="124" tvg-logo="https://i.imgur.com/6mNQ9mM.png" group-title="Hindi - Movies (20)" resolution="sd",Goldmines Bollywood
 https://mumt03.tangotv.in/Dsly5z3HGOLDMINESBOLLYWOOD/index.m3u8
@@ -597,7 +597,7 @@ https://sis-global.prod.samsungtv.plus/v1/tvpprd/sc-mp2ar4ca425xo.m3u8
 https://jmp2.uk/stvp-IN40000100Y
 #EXTINF:-1 tvg-id="ZeeCineClassic.in" tvg-chno="135" tvg-logo="https://tvpnlogopus.samsungcloud.tv/platform/image/sourcelogo/vc/00/02/34/IN21000014R_20260325T012324SQUARE.png" group-title="Hindi - Movies (20)" resolution="fhd",Zee Cine Classic ᶠᴴᴰ
 https://amg00862-amg00862c8-amgplt0173.playout.now3.amagi.tv/playlist/amg00862-amg00862c8-amgplt0173/playlist.m3u8
-#EXTINF:-1 tvg-id="ZeeCinema.in" tvg-chno="136" tvg-logo="https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_ZEE_CINEMA_HD/images/LOGO_HD/LOGO_HD_image.png" group-title="Hindi - Movies (20)" resolution="sd",Zee Cinema
+#EXTINF: group-title="Hindi"-1 tvg-id="ZeeCinema.in" tvg-chno="136" tvg-logo="https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_ZEE_CINEMA_HD/images/LOGO_HD/LOGO_HD_image.png" resolution="sd",Zee Cinema
 https://d1g8wgjurz8via.cloudfront.net/bpk-tv/NGCHD/default/NGCHD.m3u8
 #EXTINF:-1 tvg-id="9XJalwa.in" tvg-chno="137" tvg-logo="https://xstreamcp-assets-msp.streamready.in/assets/LIVETV/LIVECHANNEL/LIVETV_LIVETVCHANNEL_9X_JALWA/images/LOGO_HD/image.png" group-title="Hindi - Music (17)" resolution="fhd",9X Jalwa ᶠᴴᴰ
 https://wiselp.wiseplayout.com/9X_Jalwa/master.m3u8
