@@ -152,28 +152,13 @@ for extinf, url in dom9_channels:
 print(f"✅ dom9: Added {len(dom9_kept)} channels (all in 'dom9' group)")
 
 # ------------------------------------------------------------
-# STEP 4: Download Tubi - Force ALL channels into "Tubi" group
-#         (Like dom9 - NO sub-groups, everything flattened)
+# STEP 4: Download English International Playlist (NO FILTERING)
 # ------------------------------------------------------------
-tubi_url = "https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/refs/heads/main/playlists/tubi_all.m3u"
-tubi_channels = download_playlist(tubi_url)
-tubi_kept = []
+eng_intl_url = "https://raw.githubusercontent.com/wizakorhd/iptv/main/playlist-english-intl.m3u"
+eng_intl_channels = download_playlist(eng_intl_url)
+eng_intl_kept = []
 
-for extinf, url in tubi_channels:
-    # Force ALL channels into "Tubi" group (removes any sub-categories)
-    extinf_new = set_group_and_logo(extinf, "Tubi")
-    tubi_kept.append((extinf_new, url))
-
-print(f"✅ Tubi: Added {len(tubi_kept)} channels (all in 'Tubi' group, no sub-groups)")
-
-# ------------------------------------------------------------
-# STEP 5: Download WizakorHD - NO FILTERING (keep all channels)
-# ------------------------------------------------------------
-wiz_url = "https://raw.githubusercontent.com/wizakorhd/iptv/main/playlist.m3u"
-wiz_channels = download_playlist(wiz_url)
-wiz_kept = []
-
-for extinf, url in wiz_channels:
+for extinf, url in eng_intl_channels:
     # Keep all channels, ensure they have a group-title
     extinf_new = extinf
     if 'group-title="' not in extinf_new:
@@ -181,14 +166,52 @@ for extinf, url in wiz_channels:
             extinf_new = extinf_new.replace('tvg-logo="', 'tvg-logo="" group-title="Uncategorized"', 1)
         else:
             extinf_new = extinf_new.replace('#EXTINF:', '#EXTINF: group-title="Uncategorized"', 1)
-    wiz_kept.append((extinf_new, url))
+    eng_intl_kept.append((extinf_new, url))
 
-print(f"✅ WizakorHD: Added {len(wiz_kept)} channels (no filtering)")
+print(f"✅ English International: Added {len(eng_intl_kept)} channels (no filtering)")
 
 # ------------------------------------------------------------
-# STEP 6: Merge and write final output.m3u
+# STEP 5: Download English India Playlist (NO FILTERING)
 # ------------------------------------------------------------
-all_final = malayalam_kept + tamil_kept + dom9_kept + tubi_kept + wiz_kept
+eng_india_url = "https://raw.githubusercontent.com/wizakorhd/iptv/main/playlist-english-india.m3u"
+eng_india_channels = download_playlist(eng_india_url)
+eng_india_kept = []
+
+for extinf, url in eng_india_channels:
+    # Keep all channels, ensure they have a group-title
+    extinf_new = extinf
+    if 'group-title="' not in extinf_new:
+        if 'tvg-logo="' in extinf_new:
+            extinf_new = extinf_new.replace('tvg-logo="', 'tvg-logo="" group-title="Uncategorized"', 1)
+        else:
+            extinf_new = extinf_new.replace('#EXTINF:', '#EXTINF: group-title="Uncategorized"', 1)
+    eng_india_kept.append((extinf_new, url))
+
+print(f"✅ English India: Added {len(eng_india_kept)} channels (no filtering)")
+
+# ------------------------------------------------------------
+# STEP 6: Download Anime Playlist (NO FILTERING)
+# ------------------------------------------------------------
+anime_url = "https://raw.githubusercontent.com/wizakorhd/iptv/main/playlist-anime.m3u"
+anime_channels = download_playlist(anime_url)
+anime_kept = []
+
+for extinf, url in anime_channels:
+    # Keep all channels, ensure they have a group-title
+    extinf_new = extinf
+    if 'group-title="' not in extinf_new:
+        if 'tvg-logo="' in extinf_new:
+            extinf_new = extinf_new.replace('tvg-logo="', 'tvg-logo="" group-title="Anime"', 1)
+        else:
+            extinf_new = extinf_new.replace('#EXTINF:', '#EXTINF: group-title="Anime"', 1)
+    anime_kept.append((extinf_new, url))
+
+print(f"✅ Anime: Added {len(anime_kept)} channels (no filtering)")
+
+# ------------------------------------------------------------
+# STEP 7: Merge and write final output.m3u
+# ------------------------------------------------------------
+all_final = malayalam_kept + tamil_kept + dom9_kept + eng_intl_kept + eng_india_kept + anime_kept
 
 with open("output.m3u", "w", encoding="utf-8") as f:
     f.write("#EXTM3U\n")
@@ -200,5 +223,6 @@ print(f"\n✅ FINAL: {len(all_final)} total channels in output.m3u")
 print(f"   🟢 Malayalam (filtered): {len(malayalam_kept)}")
 print(f"   🔴 Tamil (filtered): {len(tamil_kept)}")
 print(f"   🟠 dom9 (all channels): {len(dom9_kept)}")
-print(f"   🟣 Tubi (all channels, no sub-groups): {len(tubi_kept)}")
-print(f"   🟡 WizakorHD (no filtering): {len(wiz_kept)}")
+print(f"   🟡 English International (no filtering): {len(eng_intl_kept)}")
+print(f"   🟢 English India (no filtering): {len(eng_india_kept)}")
+print(f"   🟣 Anime (no filtering): {len(anime_kept)}")
