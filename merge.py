@@ -30,22 +30,8 @@ APPROVED_TAMIL = [
     "Ultimate TV", "Vendhar TV", "YET TV", "Zee Tamil HD"
 ]
 
-# ------------------------------------------------------------
-# YOUR APPROVED HINDI CHANNELS (from wizakorhd source)
-# ------------------------------------------------------------
-APPROVED_HINDI = [
-    "StarPlus", "Zee TV", "Dangal TV", "Sony Entertainment Television",
-    "Aaj Tak", "Zee Cinema", "Goldmines", "Sony Max 1",
-    "DD National", "ABP News", "India TV", "News18 India",
-    "Zee News", "TV9 Bharatvarsh", "NDTV India", "Zee Business",
-    "B4U Movies", "B4U Kadak", "Shemaroo TV", "Shemaroo Umang",
-    "Zee Cine Classic", "Star Sports 2 Hindi", "Dangal 2",
-    "&TV", "DD Sports"
-]
-
 MALAYALAM_SET = {name.lower() for name in APPROVED_MALAYALAM}
 TAMIL_SET = {name.lower() for name in APPROVED_TAMIL}
-HINDI_SET = {name.lower() for name in APPROVED_HINDI}
 
 # ------------------------------------------------------------
 # CUSTOM STREAM LINK & LOGO FOR MAZHAVIL MANORAMA HD
@@ -166,53 +152,49 @@ for extinf, url in dom9_channels:
 print(f"✅ dom9: Added {len(dom9_kept)} channels (all in 'dom9' group)")
 
 # ------------------------------------------------------------
-# STEP 4: Download wizakorhd - ONLY filter Hindi channels
-# All other categories (English, Sports, Movies, etc.) stay untouched
+# STEP 4: Download English International Playlist (NO FILTERING)
 # ------------------------------------------------------------
-wiz_url = "https://raw.githubusercontent.com/wizakorhd/iptv/main/playlist.m3u"
-wiz_channels = download_playlist(wiz_url)
-wiz_kept = []
-hindi_filtered_count = 0
-other_kept_count = 0
+english_intl_url = "https://raw.githubusercontent.com/wizakorhd/iptv/main/playlist-english-intl.m3u"
+english_intl_channels = download_playlist(english_intl_url)
+english_intl_kept = []
 
-for extinf, url in wiz_channels:
-    if "," in extinf:
-        full_name = extinf.split(",")[-1].strip()
-    else:
-        full_name = "Unknown"
+for extinf, url in english_intl_channels:
+    extinf_new = extinf
+    if 'group-title="' not in extinf_new:
+        if 'tvg-logo="' in extinf_new:
+            extinf_new = extinf_new.replace('tvg-logo="', 'tvg-logo="" group-title="Uncategorized"', 1)
+        else:
+            extinf_new = extinf_new.replace('#EXTINF:', '#EXTINF: group-title="Uncategorized"', 1)
+    english_intl_kept.append((extinf_new, url))
 
-    # Check if this is a Hindi channel
-    if clean_name(full_name) in HINDI_SET:
-        # Force it into "Hindi" group
-        extinf_new = set_group_and_logo(extinf, "Hindi")
-        wiz_kept.append((extinf_new, url))
-        hindi_filtered_count += 1
-    else:
-        # Keep it exactly as-is (original group, original logo)
-        # But we need to ensure it has a group-title (if missing, assign "Uncategorized")
-        extinf_new = extinf
-        # If no group-title exists, add one
-        if 'group-title="' not in extinf_new:
-            if 'tvg-logo="' in extinf_new:
-                extinf_new = extinf_new.replace('tvg-logo="', 'tvg-logo="" group-title="Uncategorized"', 1)
-            else:
-                extinf_new = extinf_new.replace('#EXTINF:', '#EXTINF: group-title="Uncategorized"', 1)
-        wiz_kept.append((extinf_new, url))
-        other_kept_count += 1
-
-print(f"✅ wizakorhd: Kept {len(wiz_kept)} channels total")
-print(f"   🟡 Hindi channels (filtered & grouped): {hindi_filtered_count}")
-print(f"   ⚪ Other categories (untouched): {other_kept_count}")
+print(f"✅ English International: Added {len(english_intl_kept)} channels (no filtering)")
 
 # ------------------------------------------------------------
-# STEP 5: Download freecasthub (NO filtering)
+# STEP 5: Download English India Playlist (NO FILTERING)  ← 🆕 NEW
+# ------------------------------------------------------------
+english_india_url = "https://raw.githubusercontent.com/wizakorhd/iptv/main/playlist-english-india.m3u"
+english_india_channels = download_playlist(english_india_url)
+english_india_kept = []
+
+for extinf, url in english_india_channels:
+    extinf_new = extinf
+    if 'group-title="' not in extinf_new:
+        if 'tvg-logo="' in extinf_new:
+            extinf_new = extinf_new.replace('tvg-logo="', 'tvg-logo="" group-title="Uncategorized"', 1)
+        else:
+            extinf_new = extinf_new.replace('#EXTINF:', '#EXTINF: group-title="Uncategorized"', 1)
+    english_india_kept.append((extinf_new, url))
+
+print(f"✅ English India: Added {len(english_india_kept)} channels (no filtering)")
+
+# ------------------------------------------------------------
+# STEP 6: Download freecasthub (NO filtering)
 # ------------------------------------------------------------
 free_url = "https://raw.githubusercontent.com/freecasthub/public-iptv/main/playlist.m3u"
 free_channels = download_playlist(free_url)
 free_kept = []
 
 for extinf, url in free_channels:
-    # Ensure it has a group-title (if missing, assign "Uncategorized")
     extinf_new = extinf
     if 'group-title="' not in extinf_new:
         if 'tvg-logo="' in extinf_new:
@@ -224,9 +206,9 @@ for extinf, url in free_channels:
 print(f"✅ freecasthub: Added {len(free_kept)} channels (untouched)")
 
 # ------------------------------------------------------------
-# STEP 6: Merge and write final output.m3u
+# STEP 7: Merge and write final output.m3u
 # ------------------------------------------------------------
-all_final = malayalam_kept + tamil_kept + dom9_kept + wiz_kept + free_kept
+all_final = malayalam_kept + tamil_kept + dom9_kept + english_intl_kept + english_india_kept + free_kept
 
 with open("output.m3u", "w", encoding="utf-8") as f:
     f.write("#EXTM3U\n")
@@ -238,5 +220,6 @@ print(f"\n✅ FINAL: {len(all_final)} total channels in output.m3u")
 print(f"   🟢 Malayalam (filtered): {len(malayalam_kept)}")
 print(f"   🔴 Tamil (filtered): {len(tamil_kept)}")
 print(f"   🟠 dom9 (all channels): {len(dom9_kept)}")
-print(f"   🟡 wizakorhd: {len(wiz_kept)} (Hindi filtered, others untouched)")
+print(f"   🟡 English International (no filtering): {len(english_intl_kept)}")
+print(f"   🟢 English India (no filtering): {len(english_india_kept)}")
 print(f"   ⚪ freecasthub (untouched): {len(free_kept)}")
