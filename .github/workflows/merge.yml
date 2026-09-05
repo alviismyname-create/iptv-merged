@@ -178,7 +178,45 @@ jobs:
           print(f"✅ dom9: Added {len(dom9_kept)} channels (all in 'dom9' group)")
 
           # ------------------------------------------------------------
-          # STEP 4: Download WizakorHD - NO FILTERING (keep all channels)
+          # STEP 4: Download BuddyLive Combined Playlist (NO FILTERING)
+          # ------------------------------------------------------------
+          buddy_url = "https://raw.githubusercontent.com/BuddyChewChew/buddylive-combined/refs/heads/main/combined_playlist.m3u"
+          buddy_channels = download_playlist(buddy_url)
+          buddy_kept = []
+
+          for extinf, url in buddy_channels:
+              # Keep all channels, ensure they have a group-title
+              extinf_new = extinf
+              if 'group-title="' not in extinf_new:
+                  if 'tvg-logo="' in extinf_new:
+                      extinf_new = extinf_new.replace('tvg-logo="', 'tvg-logo="" group-title="BuddyLive"', 1)
+                  else:
+                      extinf_new = extinf_new.replace('#EXTINF:', '#EXTINF: group-title="BuddyLive"', 1)
+              buddy_kept.append((extinf_new, url))
+
+          print(f"✅ BuddyLive Combined: Added {len(buddy_kept)} channels (no filtering)")
+
+          # ------------------------------------------------------------
+          # STEP 5: Download Sports Playlist (NO FILTERING)
+          # ------------------------------------------------------------
+          sports_url = "https://raw.githubusercontent.com/BuddyChewChew/sports/refs/heads/main/liveeventsfilter.m3u8"
+          sports_channels = download_playlist(sports_url)
+          sports_kept = []
+
+          for extinf, url in sports_channels:
+              # Keep all channels, ensure they have a group-title
+              extinf_new = extinf
+              if 'group-title="' not in extinf_new:
+                  if 'tvg-logo="' in extinf_new:
+                      extinf_new = extinf_new.replace('tvg-logo="', 'tvg-logo="" group-title="Sports"', 1)
+                  else:
+                      extinf_new = extinf_new.replace('#EXTINF:', '#EXTINF: group-title="Sports"', 1)
+              sports_kept.append((extinf_new, url))
+
+          print(f"✅ Sports: Added {len(sports_kept)} channels (no filtering)")
+
+          # ------------------------------------------------------------
+          # STEP 6: Download WizakorHD - NO FILTERING (keep all channels)
           # ------------------------------------------------------------
           wiz_url = "https://raw.githubusercontent.com/wizakorhd/iptv/main/playlist.m3u"
           wiz_channels = download_playlist(wiz_url)
@@ -197,9 +235,9 @@ jobs:
           print(f"✅ WizakorHD: Added {len(wiz_kept)} channels (no filtering)")
 
           # ------------------------------------------------------------
-          # STEP 5: Merge and write final output.m3u
+          # STEP 7: Merge and write final output.m3u
           # ------------------------------------------------------------
-          all_final = malayalam_kept + tamil_kept + dom9_kept + wiz_kept
+          all_final = malayalam_kept + tamil_kept + dom9_kept + buddy_kept + sports_kept + wiz_kept
 
           with open("output.m3u", "w", encoding="utf-8") as f:
               f.write("#EXTM3U\n")
@@ -211,10 +249,38 @@ jobs:
           print(f"   🟢 Malayalam (filtered): {len(malayalam_kept)}")
           print(f"   🔴 Tamil (filtered): {len(tamil_kept)}")
           print(f"   🟠 dom9 (all channels): {len(dom9_kept)}")
-          print(f"   🟡 WizakorHD (no filtering): {len(wiz_kept)}")
+          print(f"   🟣 BuddyLive Combined (no filtering): {len(buddy_kept)}")
+          print(f"   🟡 Sports (no filtering): {len(sports_kept)}")
+          print(f"   🟠 WizakorHD (no filtering): {len(wiz_kept)}")
           EOF
 
           python3 merge.py
+
+      - name: Check Missing Logos
+        run: |
+          echo "🔍 Checking for channels without logos..."
+          echo ""
+          
+          # Count channels with missing logos
+          MISSING=$(grep -c 'tvg-logo=""' output.m3u || echo "0")
+          TOTAL=$(grep -c '^#EXTINF' output.m3u || echo "0")
+          
+          echo "📊 Total channels: $TOTAL"
+          echo "❌ Channels without logos: $MISSING"
+          echo ""
+          
+          if [ "$MISSING" -gt 0 ]; then
+            echo "📋 Channels missing logos (first 20):"
+            echo "----------------------------------------"
+            grep 'tvg-logo=""' output.m3u | head -20 | sed 's/.*,//'
+            echo ""
+            
+            if [ "$MISSING" -gt 20 ]; then
+              echo "... and $((MISSING - 20)) more channels missing logos"
+            fi
+          else
+            echo "🎉 All channels have logos!"
+          fi
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
