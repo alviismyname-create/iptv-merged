@@ -21,7 +21,7 @@ jobs:
           # Initialize the M3U file with the standard header
           echo "#EXTM3U" > merged.m3u
 
-          # List of all 4 of your source URLs
+          # List of all 5 of your source URLs
           urls=(
             "https://raw.githubusercontent.com/wizakorhd/iptv/main/playlist.m3u"
             "https://raw.githubusercontent.com/doms9/iptv/refs/heads/default/M3U8/base.m3u8"
