@@ -1,0 +1,49 @@
+name: Merge IPTV Playlists
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # Runs automatically every 6 hours
+  workflow_dispatch:         # Allows you to manually run it anytime
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download and Merge Playlists
+        run: |
+          # Initialize the M3U file with the standard header
+          echo "#EXTM3U" > merged.m3u
+
+          # List of all 4 of your source URLs
+          urls=(
+            "https://raw.githubusercontent.com/wizakorhd/iptv/main/playlist.m3u"
+            "https://raw.githubusercontent.com/doms9/iptv/refs/heads/default/M3U8/base.m3u8"
+            "https://iptv-org.github.io/iptv/languages/mal.m3u"
+            "https://iptv-org.github.io/iptv/languages/tam.m3u"
+          )
+
+          for url in "${urls[@]}"; do
+            echo "Downloading: $url"
+            # Download the file
+            wget -q -O temp.m3u "$url"
+            # Remove the header (#EXTM3U) from each file and append to the master list
+            grep -v -i "^#EXTM3U" temp.m3u >> merged.m3u
+          done
+
+          # Copy to final output file for GitHub Pages
+          cp merged.m3u output.m3u
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
+          publish_branch: gh-pages
+          keep_files: false
