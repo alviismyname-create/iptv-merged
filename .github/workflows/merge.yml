@@ -26,7 +26,6 @@ jobs:
           # ------------------------------------------------------------
           echo "Downloading Malayalam (mal.m3u)..."
           wget -q -O temp.m3u "https://iptv-org.github.io/iptv/languages/mal.m3u"
-          # Remove header, remove any existing group-title, force "Malayalam"
           grep -v -i "^#EXTM3U" temp.m3u | sed -E 's/ group-title="[^"]*"//g; s/^#EXTINF:/#EXTINF: group-title="Malayalam" /' >> merged.m3u
 
           # ------------------------------------------------------------
@@ -34,11 +33,10 @@ jobs:
           # ------------------------------------------------------------
           echo "Downloading Tamil (tam.m3u)..."
           wget -q -O temp.m3u "https://iptv-org.github.io/iptv/languages/tam.m3u"
-          # Remove header, remove any existing group-title, force "Tamil"
           grep -v -i "^#EXTM3U" temp.m3u | sed -E 's/ group-title="[^"]*"//g; s/^#EXTINF:/#EXTINF: group-title="Tamil" /' >> merged.m3u
 
           # ------------------------------------------------------------
-          # 3. OTHER 3 SOURCES - Keep as-is (will be categorized in Python step)
+          # 3. OTHER 3 SOURCES - Download them WITHOUT any changes
           # ------------------------------------------------------------
           urls=(
             "https://raw.githubusercontent.com/wizakorhd/iptv/main/playlist.m3u"
@@ -49,6 +47,7 @@ jobs:
           for url in "${urls[@]}"; do
             echo "Downloading: $url"
             wget -q -O temp.m3u "$url"
+            # Append WITHOUT modifying anything (keep their original group-titles)
             grep -v -i "^#EXTM3U" temp.m3u >> merged.m3u
           done
 
@@ -59,10 +58,10 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Create and Run Categorizer Script
+      - name: Reorder Playlist (Malayalam 1st, Tamil 2nd)
         run: |
           # Create the Python script directly inside the workflow
-          cat > categorizer.py << 'EOF'
+          cat > reorder.py << 'EOF'
           import re
           import sys
           from collections import OrderedDict
@@ -70,31 +69,8 @@ jobs:
           INPUT_FILE = "merged.m3u"
           OUTPUT_FILE = "output.m3u"
 
-          # --- PROTECTED GROUPS (These will NOT be re-categorized) ---
-          PROTECTED_GROUPS = ["Malayalam", "Tamil"]
-
-          # --- FILTER (Adult/NSFW) ---
+          # Optional: Filter out adult channels (remove these keywords if you don't want filtering)
           FILTER_KEYWORDS = ["xxx", "adult", "18+", "porn", "sex", "fuck", "hardcore"]
-
-          # --- CATEGORY MAPPING for the OTHER 3 SOURCES ---
-          CATEGORY_MAP = {
-              "News": ["cnn", "bbc", "sky news", "al jazeera", "fox news", "msnbc", "ndtv", "times now", "republic"],
-              "Sports": ["espn", "sky sports", "nfl", "nba", "bein", "dazn", "moto gp", "f1", "formula", "cricket", "ipl"],
-              "Movies": ["hbo", "starz", "cinemax", "amc", "paramount", "film", "movie", "cinema"],
-              "Entertainment": ["mtv", "comedy", "discovery", "national geographic", "tlc", "e!", "vice"],
-              "Music": ["stingray", "radio", "mtv live", "vivid", "music"],
-              "Kids": ["cartoon", "disney", "nickelodeon", "paw patrol", "boomerang", "child"],
-              "Documentary": ["nat geo", "history", "bbc earth", "documentary", "science"],
-              "US Local": ["abc", "nbc", "cbs", "fox", "cw", "pbs", "usa", "us"],
-          }
-
-          def categorize_channel(name):
-              name_lower = name.lower()
-              for category, keywords in CATEGORY_MAP.items():
-                  for kw in keywords:
-                      if kw in name_lower:
-                          return category
-              return "Uncategorized"
 
           def is_filtered(name):
               name_lower = name.lower()
@@ -128,76 +104,73 @@ jobs:
               match = re.search(r'group-title="([^"]*)"', extinf)
               return match.group(1) if match else None
 
-          def build_m3u(channels):
-              # 1. Remove duplicates by URL
-              seen_urls = OrderedDict()
-              for extinf, url in channels:
-                  if url not in seen_urls:
-                      seen_urls[url] = extinf
+          def set_group(extinf, group_name):
+              # Remove any existing group-title, then force the new one
+              extinf = re.sub(r'group-title="[^"]*"', '', extinf)
+              extinf = re.sub(r'\s+', ' ', extinf)  # Clean up spaces
+              if 'tvg-logo="' in extinf:
+                  extinf = extinf.replace('tvg-logo="', f'tvg-logo="" group-title="{group_name}"', 1)
+              else:
+                  extinf = extinf.replace('#EXTINF:', f'#EXTINF: group-title="{group_name}"', 1)
+              return extinf
 
-              processed = []
-              for url, extinf in seen_urls.items():
+          def write_m3u(output_path, channels):
+              with open(output_path, 'w', encoding='utf-8') as f:
+                  f.write("#EXTM3U\n")
+                  for extinf, url in channels:
+                      f.write(extinf + "\n")
+                      f.write(url + "\n")
+
+          if __name__ == "__main__":
+              raw = parse_m3u(INPUT_FILE)
+              print(f"✅ Parsed {len(raw)} raw channels")
+
+              # 1. Remove duplicates by URL (keeps the first occurrence)
+              seen = OrderedDict()
+              for extinf, url in raw:
+                  if url not in seen:
+                      seen[url] = extinf
+
+              # 2. Separate into three buckets
+              malayalam = []
+              tamil = []
+              others = []
+
+              for url, extinf in seen.items():
                   if ',' in extinf:
                       name = extinf.split(',')[-1].strip()
                   else:
                       name = "Unknown"
 
+                  # Filter adult content (optional)
                   if is_filtered(name):
                       continue
 
-                  existing_group = get_existing_group(extinf)
-                  if existing_group in PROTECTED_GROUPS:
-                      # Keep Malayalam and Tamil exactly as they are
-                      processed.append((extinf, url, name, existing_group))
+                  group = get_existing_group(extinf)
+
+                  if group == "Malayalam":
+                      extinf = set_group(extinf, "Malayalam")
+                      malayalam.append((extinf, url))
+                  elif group == "Tamil":
+                      extinf = set_group(extinf, "Tamil")
+                      tamil.append((extinf, url))
                   else:
-                      # Categorize the other sources
-                      extinf_cleaned = re.sub(r'group-title="[^"]*"', '', extinf)
-                      category = categorize_channel(name)
+                      # DO NOT MODIFY these channels. Keep their original group-title exactly as-is.
+                      others.append((extinf, url))
 
-                      if 'tvg-logo="' in extinf_cleaned:
-                          extinf_new = extinf_cleaned.replace('tvg-logo="', f'tvg-logo="" group-title="{category}"', 1)
-                      else:
-                          extinf_new = extinf_cleaned.replace('#EXTINF:', f'#EXTINF: group-title="{category}"', 1)
+              # 3. Combine in the required order: MALAYALAM -> TAMIL -> EVERYONE ELSE
+              final_channels = malayalam + tamil + others
 
-                      extinf_new = re.sub(r'\s+', ' ', extinf_new)
-                      processed.append((extinf_new, url, name, category))
+              write_m3u(OUTPUT_FILE, final_channels)
 
-              processed.sort(key=lambda x: x[2].lower())
-              return processed
-
-          def write_m3u(output_path, channels):
-              with open(output_path, 'w', encoding='utf-8') as f:
-                  f.write("#EXTM3U\n")
-                  for extinf, url, _, _ in channels:
-                      f.write(extinf + "\n")
-                      f.write(url + "\n")
-
-          if __name__ == "__main__":
-              try:
-                  raw = parse_m3u(INPUT_FILE)
-                  print(f"✅ Parsed {len(raw)} channels from {INPUT_FILE}")
-
-                  final = build_m3u(raw)
-                  print(f"✅ After dedupe, filtering, and sorting: {len(final)} channels left")
-
-                  write_m3u(OUTPUT_FILE, final)
-                  print(f"✅ Successfully wrote categorized playlist to {OUTPUT_FILE}")
-
-                  counts = {}
-                  for _, _, _, cat in final:
-                      counts[cat] = counts.get(cat, 0) + 1
-
-                  print("\n📊 Final Category Breakdown:")
-                  for cat, count in sorted(counts.items(), key=lambda x: -x[1]):
-                      print(f"   {cat}: {count}")
-
-              except Exception as e:
-                  print(f"❌ Error: {e}")
-                  sys.exit(1)
+              print(f"✅ Final playlist has {len(final_channels)} channels")
+              print(f"   🟢 Malayalam: {len(malayalam)}")
+              print(f"   🔴 Tamil: {len(tamil)}")
+              print(f"   ⚪ Other sources (original categories kept): {len(others)}")
           EOF
 
-          # Now run the Python script
-          python3 categorizer.py
+          # Run the Python script
+          python3 reorder.py
 
       - name: Preview output
         run: |
