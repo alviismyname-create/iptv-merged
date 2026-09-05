@@ -58,7 +58,7 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Reorder Playlist (Malayalam 1st, Tamil 2nd)
+      - name: Filter Malayalam & Reorder (Malayalam 1st, Tamil 2nd)
         run: |
           # Create the Python script directly inside the workflow
           cat > reorder.py << 'EOF'
@@ -69,7 +69,7 @@ jobs:
           INPUT_FILE = "merged.m3u"
           OUTPUT_FILE = "output.m3u"
 
-          # Optional: Filter out adult channels (remove these keywords if you don't want filtering)
+          # ---------- FILTER: Remove Adult/NSFW globally (optional) ----------
           FILTER_KEYWORDS = ["xxx", "adult", "18+", "porn", "sex", "fuck", "hardcore"]
 
           def is_filtered(name):
@@ -78,6 +78,27 @@ jobs:
                   if kw in name_lower:
                       return True
               return False
+
+          # ---------- APPROVED LIST: Only these channels stay in "Malayalam" ----------
+          APPROVED_MALAYALAM = {
+              "24 News", "Amrita TV", "Anand TV", "Asianet HD", "Asianet Middle East",
+              "Asianet Movies HD", "Asianet News", "Big TV 24x7", "DD Malayalam",
+              "Flowers TV USA", "Harvest TV", "Jaihind TV", "Janam TV", "Jeevan TV",
+              "Kairali Arabia", "Kairali News", "Kairali TV", "Kairali We", "Kappa TV",
+              "KITE Victers (Kerala)", "Manorama News", "Mathrubhumi News", "Mazhavil Manorama",
+              "Mazhavil Manorama HD", "Media One", "meWATCH LIVE 1", "News18 Kerala",
+              "Reporter TV", "Safari TV", "Shalom", "Shalom Global", "Starnet", "UTV Palakkad"
+          }
+
+          def clean_channel_name(name):
+              """Remove resolution tags like (720p), (1080p), [Not 24/7] etc. for matching only."""
+              # Remove (720p), (1080p), (576p), (480p), (576i)
+              name = re.sub(r'\s*\(\d{3,4}[pi]\)', '', name, flags=re.IGNORECASE)
+              # Remove [Not 24/7] etc.
+              name = re.sub(r'\s*\[[^]]*\]', '', name)
+              # Remove trailing spaces and collapse multiple spaces
+              name = re.sub(r'\s+', ' ', name)
+              return name.strip()
 
           def parse_m3u(filepath):
               channels = []
@@ -105,9 +126,9 @@ jobs:
               return match.group(1) if match else None
 
           def set_group(extinf, group_name):
-              # Remove any existing group-title, then force the new one
+              """Forcefully set the group-title (removes any existing one)."""
               extinf = re.sub(r'group-title="[^"]*"', '', extinf)
-              extinf = re.sub(r'\s+', ' ', extinf)  # Clean up spaces
+              extinf = re.sub(r'\s+', ' ', extinf)
               if 'tvg-logo="' in extinf:
                   extinf = extinf.replace('tvg-logo="', f'tvg-logo="" group-title="{group_name}"', 1)
               else:
@@ -131,31 +152,44 @@ jobs:
                   if url not in seen:
                       seen[url] = extinf
 
-              # 2. Separate into three buckets
+              # 2. Separate into buckets
               malayalam = []
               tamil = []
               others = []
 
               for url, extinf in seen.items():
                   if ',' in extinf:
-                      name = extinf.split(',')[-1].strip()
+                      full_name = extinf.split(',')[-1].strip()
                   else:
-                      name = "Unknown"
+                      full_name = "Unknown"
 
-                  # Filter adult content (optional)
-                  if is_filtered(name):
+                  # Global adult filter (optional - keep it)
+                  if is_filtered(full_name):
                       continue
 
                   group = get_existing_group(extinf)
 
+                  # ---------- ONLY filter the Malayalam group ----------
                   if group == "Malayalam":
+                      # Clean the name for matching (ignore resolution/quality)
+                      cleaned = clean_channel_name(full_name)
+                      
+                      # Check if this channel is in our approved list
+                      if cleaned not in APPROVED_MALAYALAM:
+                          # ❌ REMOVE this channel (do NOT add it to any bucket)
+                          print(f"   🗑️ Removing from Malayalam: {full_name}")
+                          continue
+                      
+                      # ✅ APPROVED: Keep it, force group="Malayalam" just in case
                       extinf = set_group(extinf, "Malayalam")
                       malayalam.append((extinf, url))
+                  
                   elif group == "Tamil":
-                      extinf = set_group(extinf, "Tamil")
+                      # ✨ DO NOTHING to Tamil - keep exactly as is
                       tamil.append((extinf, url))
+                  
                   else:
-                      # DO NOT MODIFY these channels. Keep their original group-title exactly as-is.
+                      # ✨ DO NOTHING to other groups - keep their original group-title exactly
                       others.append((extinf, url))
 
               # 3. Combine in the required order: MALAYALAM -> TAMIL -> EVERYONE ELSE
@@ -163,10 +197,10 @@ jobs:
 
               write_m3u(OUTPUT_FILE, final_channels)
 
-              print(f"✅ Final playlist has {len(final_channels)} channels")
-              print(f"   🟢 Malayalam: {len(malayalam)}")
-              print(f"   🔴 Tamil: {len(tamil)}")
-              print(f"   ⚪ Other sources (original categories kept): {len(others)}")
+              print(f"\n✅ Final playlist has {len(final_channels)} channels")
+              print(f"   🟢 Malayalam (kept only approved): {len(malayalam)}")
+              print(f"   🔴 Tamil (unchanged): {len(tamil)}")
+              print(f"   ⚪ Other sources (completely untouched): {len(others)}")
           EOF
 
           # Run the Python script
