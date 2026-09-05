@@ -2,8 +2,8 @@ name: Merge IPTV Playlists
 
 on:
   schedule:
-    - cron: '0 */6 * * *'   # Runs automatically every 6 hours
-  workflow_dispatch:         # Allows you to manually run it anytime
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -18,27 +18,40 @@ jobs:
 
       - name: Download and Merge Playlists
         run: |
-          # Initialize the M3U file with the standard header
           echo "#EXTM3U" > merged.m3u
 
-          # List of all 4 of your source URLs
-          urls=(
-            "https://iptv-org.github.io/iptv/languages/mal.m3u"
-            "https://iptv-org.github.io/iptv/languages/tam.m3u"
-            "https://raw.githubusercontent.com/doms9/iptv/refs/heads/default/M3U8/base.m3u8"
-            "https://raw.githubusercontent.com/wizakorhd/iptv/main/playlist.m3u"
-            "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8"
-          )
+          # =============================================
+          # 1. MALAYALAM – Force all to "Malayalam" group
+          # =============================================
+          echo "Downloading: Malayalam"
+          wget -q -O mal.m3u "https://iptv-org.github.io/iptv/languages/mal.m3u"
+          sed -i 's/group-title="[^"]*"/group-title="Malayalam"/g' mal.m3u
+          grep -v -i "^#EXTM3U" mal.m3u >> merged.m3u
 
-          for url in "${urls[@]}"; do
-            echo "Downloading: $url"
-            # Download the file
-            wget -q -O temp.m3u "$url"
-            # Remove the header (#EXTM3U) from each file and append to the master list
-            grep -v -i "^#EXTM3U" temp.m3u >> merged.m3u
-          done
+          # =============================================
+          # 2. TAMIL – Force all to "Tamil" group
+          # =============================================
+          echo "Downloading: Tamil"
+          wget -q -O tam.m3u "https://iptv-org.github.io/iptv/languages/tam.m3u"
+          sed -i 's/group-title="[^"]*"/group-title="Tamil"/g' tam.m3u
+          grep -v -i "^#EXTM3U" tam.m3u >> merged.m3u
 
-          # Copy to final output file for GitHub Pages
+          # =============================================
+          # 3. OTHER SOURCES – Keep original groups
+          # =============================================
+          echo "Downloading: Base (doms9)"
+          wget -q -O base.m3u "https://raw.githubusercontent.com/doms9/iptv/refs/heads/default/M3U8/base.m3u8"
+          grep -v -i "^#EXTM3U" base.m3u >> merged.m3u
+
+          echo "Downloading: Main (wizakorhd)"
+          wget -q -O main.m3u "https://raw.githubusercontent.com/wizakorhd/iptv/main/playlist.m3u"
+          grep -v -i "^#EXTM3U" main.m3u >> merged.m3u
+
+          echo "Downloading: Free-TV"
+          wget -q -O free.m3u "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8"
+          grep -v -i "^#EXTM3U" free.m3u >> merged.m3u
+
+          # Copy to final output
           cp merged.m3u output.m3u
 
       - name: Deploy to GitHub Pages
