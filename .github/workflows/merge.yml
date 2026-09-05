@@ -27,7 +27,7 @@ jobs:
             "https://raw.githubusercontent.com/doms9/iptv/refs/heads/default/M3U8/base.m3u8"
             "https://iptv-org.github.io/iptv/languages/mal.m3u"
             "https://iptv-org.github.io/iptv/languages/tam.m3u"
-            "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8"
+            "https://CeresLabX.github.io/us-tv/playlist.m3u"
           )
 
           for url in "${urls[@]}"; do
