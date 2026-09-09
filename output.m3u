@@ -179,8 +179,6 @@ http://23.237.104.106:8080/USA_MOREMAX/index.m3u8
 https://circle-klowdtv.amagi.tv/playlist.m3u8
 #EXTINF: group-title="dom9"-1 tvg-chno="44" tvg-id="CMT.HD.us2" tvg-name="CMT" tvg-logo="http://schedulesdirect-api20141201-logos.s3.dualstack.us-east-1.amazonaws.com/stationLogos/s10138_dark_360w_270h.png" ,CMT
 http://23.237.104.106:8080/USA_CMT/index.m3u8
-#EXTINF: group-title="dom9"-1 tvg-chno="45" tvg-id="CNBC.HD.us2" tvg-name="CNBC" tvg-logo="https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/united-states/cnbc-us.png" ,CNBC
-http://41.205.93.154/CNBC/index.m3u8
 #EXTINF: group-title="dom9"-1 tvg-chno="46" tvg-id="CNBC.World.us2" tvg-name="CNBC World" tvg-logo="https://raw.githubusercontent.com/tv-logo/tv-logos/refs/heads/main/countries/united-states/cnbc-world-us.png" ,CNBC World
 https://amg01079-nbcuuk-amg01079c2-samsung-gb-1258.playouts.now.amagi.tv/playlist.m3u8
 #EXTINF: group-title="dom9"-1 tvg-chno="48" tvg-id="plex.tv.CNN.Headlines.plex" tvg-name="CNN Headlines" tvg-logo="https://schedulesdirect-api20141201-logos.s3.dualstack.us-east-1.amazonaws.com/stationLogos/s138109_dark_360w_270h.png" ,CNN Headlines
@@ -288,7 +286,7 @@ http://23.237.104.106:8080/USA_MTV/index.m3u8
 #EXTINF: group-title="dom9"-1 tvg-chno="135" tvg-id="MTVLIVE.us2" tvg-name="MTV Live" tvg-logo="https://schedulesdirect-api20141201-logos.s3.dualstack.us-east-1.amazonaws.com/stationLogos/s74635_dark_360w_270h.png" ,MTV Live
 http://23.237.104.106:8080/USA_MTV_LIVE/index.m3u8
 #EXTINF: group-title="dom9"-1 tvg-chno="136" tvg-id="National.Geographic.HD.us2" tvg-name="Nat Geo" tvg-logo="http://schedulesdirect-api20141201-logos.s3.dualstack.us-east-1.amazonaws.com/stationLogos/s49438_dark_360w_270h.png" ,Nat Geo
-http://23.237.104.106:8080/USA_NAT_GEO/index.m3u8
+http://198.58.104.90:8989/natgeo/index.m3u8
 #EXTINF: group-title="dom9"-1 tvg-chno="137" tvg-id="National.Geographic.Wild.HD.us2" tvg-name="Nat Geo Wild" tvg-logo="https://schedulesdirect-api20141201-logos.s3.dualstack.us-east-1.amazonaws.com/stationLogos/s86880_dark_360w_270h.png" ,Nat Geo Wild
 http://23.237.104.106:8080/USA_NAT_GEO_WILD/index.m3u8
 #EXTINF: group-title="dom9"-1 tvg-chno="138" tvg-id="NBA.TV.HD.us2" tvg-name="NBA TV" tvg-logo="http://schedulesdirect-api20141201-logos.s3.dualstack.us-east-1.amazonaws.com/stationLogos/s32281_dark_360w_270h.png" ,NBA TV
