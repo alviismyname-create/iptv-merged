@@ -44,14 +44,6 @@ jobs:
           ]
 
           # ------------------------------------------------------------
-          # CHANNELS TO MOVE FROM TAMIL TO MALAYALAM
-          # ------------------------------------------------------------
-          MOVED_FROM_TAMIL = [
-              "Disney Channel HD", "Star Movies HD", "Star Movies Select HD",
-              "Star Sports 2 HD"
-          ]
-
-          # ------------------------------------------------------------
           # YOUR APPROVED TAMIL CHANNELS
           # ------------------------------------------------------------
           APPROVED_TAMIL = [
@@ -69,7 +61,7 @@ jobs:
           # ------------------------------------------------------------
           CUSTOM_MAZHAVIL_URL  = "https://mumt07.tangotv.in/zHjX9OFlMAZHAVILMANORAMAHD/tracks-v1a1/mono.m3u8"
           CUSTOM_MAZHAVIL_LOGO = "https://i.imgur.com/xCHQrH0.png"
-          GROUP_NAME = "Malayalam + Extras"
+          GROUP_NAME = "Malayalam"
           USER_AGENT = "Mozilla/5.0 (compatible; IPTV-Merger/1.0)"
 
           # ------------------------------------------------------------
@@ -82,9 +74,8 @@ jobs:
               name = re.sub(r'\s+', ' ', name)
               return name.strip().lower()
 
-          MALAYALAM_SET   = {clean_name(n) for n in APPROVED_MALAYALAM}
-          MOVED_TAMIL_SET = {clean_name(n) for n in MOVED_FROM_TAMIL}
-          TAMIL_SET       = {clean_name(n) for n in APPROVED_TAMIL}
+          MALAYALAM_SET = {clean_name(n) for n in APPROVED_MALAYALAM}
+          TAMIL_SET     = {clean_name(n) for n in APPROVED_TAMIL}
 
 
           def split_extinf(extinf):
@@ -194,31 +185,23 @@ jobs:
 
 
           # ------------------------------------------------------------
-          # STEP 2: Download Tamil, capture moved channels for Malayalam
+          # STEP 2: Download and FILTER Tamil
           # ------------------------------------------------------------
           tam_channels = download_playlist("https://iptv-org.github.io/iptv/languages/tam.m3u")
           tamil_kept = []
           tam_removed = 0
-          moved_channels = []
 
           for extinf, url in tam_channels:
               full_name = channel_name(extinf)
               cleaned   = clean_name(full_name)
 
-              if cleaned in MOVED_TAMIL_SET:
-                  extinf_new = set_group_and_logo(extinf, GROUP_NAME)
-                  moved_channels.append((extinf_new, url))
-                  print(f"   ➕ Moved to {GROUP_NAME}: {full_name}")
-              elif cleaned in TAMIL_SET:
+              if cleaned in TAMIL_SET:
                   extinf_new = set_group_and_logo(extinf, "Tamil")
                   tamil_kept.append((extinf_new, url))
               else:
                   tam_removed += 1
 
           print(f"✅ Tamil: Kept {len(tamil_kept)} channels, Removed {tam_removed} channels")
-          print(f"   ➕ Moved to Malayalam: {len(moved_channels)} channels")
-
-          malayalam_kept.extend(moved_channels)
 
 
           # ------------------------------------------------------------
@@ -242,15 +225,37 @@ jobs:
 
 
           # ------------------------------------------------------------
+          # STEP 4b: Custom channels injected into a wizakorhd group
+          # Format: (display name, stream URL, logo URL)
+          # Set logo to None if you don't have one.
+          # ------------------------------------------------------------
+          CUSTOM_GROUP = "English (Intl) - News (217)"
+
+          CUSTOM_CHANNELS = [
+              (
+                  "Al Jazeera English (1080p)",
+                  "https://live-hls-apps-aje-fa.getaj.net/AJE/index.m3u8",
+                  "https://upload.wikimedia.org/wikipedia/en/thumb/f/f2/Aljazeera_eng.svg/512px-Aljazeera_eng.svg.png",
+              ),
+              # Add more here, one tuple per channel
+          ]
+
+          for name, url, logo in CUSTOM_CHANNELS:
+              extinf = f'#EXTINF:-1 tvg-logo="{logo or ""}" group-title="{CUSTOM_GROUP}",{name}'
+              wiz_kept.append((extinf, url))
+              print(f"   ➕ Custom: {name} → {CUSTOM_GROUP}")
+
+
+          # ------------------------------------------------------------
           # STEP 5: Sanity check — abort if any source looks broken.
           # If we abort, gh-pages is left untouched, so the last good
           # playlist stays live.
           # ------------------------------------------------------------
           MIN_COUNTS = {
-              "Malayalam + Extras": (len(malayalam_kept), 10),
-              "Tamil":              (len(tamil_kept),      8),
-              "dom9":               (len(dom9_kept),       30),
-              "wizakorhd":          (len(wiz_kept),        100),
+              "Malayalam": (len(malayalam_kept), 10),
+              "Tamil":     (len(tamil_kept),      8),
+              "dom9":      (len(dom9_kept),       30),
+              "wizakorhd": (len(wiz_kept),        100),
           }
 
           aborted = False
@@ -278,10 +283,10 @@ jobs:
                   f.write(url + "\n")
 
           print(f"\n✅ FINAL: {len(all_final)} total channels in output.m3u (removed {dupes} duplicates)")
-          print(f"   🟢 {GROUP_NAME} (filtered + moved channels): {len(malayalam_kept)}")
-          print(f"   🔴 Tamil (filtered):                        {len(tamil_kept)}")
-          print(f"   🟠 dom9 (all channels):                     {len(dom9_kept)}")
-          print(f"   🟣 wizakorhd (no filtering):                {len(wiz_kept)}")
+          print(f"   🟢 {GROUP_NAME} (filtered):     {len(malayalam_kept)}")
+          print(f"   🔴 Tamil (filtered):           {len(tamil_kept)}")
+          print(f"   🟠 dom9 (all channels):        {len(dom9_kept)}")
+          print(f"   🟣 wizakorhd (no filtering):   {len(wiz_kept)}")
           EOF
 
           python3 merge.py
