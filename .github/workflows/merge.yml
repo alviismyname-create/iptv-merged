@@ -52,7 +52,7 @@ jobs:
           ]
 
           # ------------------------------------------------------------
-          # YOUR APPROVED TAMIL CHANNELS (REMOVED THE 4 MOVED CHANNELS)
+          # YOUR APPROVED TAMIL CHANNELS
           # ------------------------------------------------------------
           APPROVED_TAMIL = [
               "7S Music", "Aaryaa TV", "Chithiram", "Colors Tamil HD",
@@ -64,29 +64,47 @@ jobs:
               "Zee Tamil HD"
           ]
 
-          MALAYALAM_SET = {name.lower() for name in APPROVED_MALAYALAM}
-          MOVED_TAMIL_SET = {name.lower() for name in MOVED_FROM_TAMIL}
-          TAMIL_SET = {name.lower() for name in APPROVED_TAMIL}
-
           # ------------------------------------------------------------
           # CUSTOM STREAM LINK & LOGO FOR MAZHAVIL MANORAMA HD
           # ------------------------------------------------------------
-          CUSTOM_MAZHAVIL_URL = "https://mumt07.tangotv.in/zHjX9OFlMAZHAVILMANORAMAHD/tracks-v1a1/mono.m3u8"
+          CUSTOM_MAZHAVIL_URL  = "https://mumt07.tangotv.in/zHjX9OFlMAZHAVILMANORAMAHD/tracks-v1a1/mono.m3u8"
           CUSTOM_MAZHAVIL_LOGO = "https://i.imgur.com/xCHQrH0.png"
           GROUP_NAME = "Malayalam + Extras"
+          USER_AGENT = "Mozilla/5.0 (compatible; IPTV-Merger/1.0)"
 
+          # ------------------------------------------------------------
+          # Helpers
+          # ------------------------------------------------------------
           def clean_name(name):
-              """Remove resolution tags like (720p), [Not 24/7] for matching."""
+              """Strip resolution tags / [Not 24/7] style suffixes for matching."""
               name = re.sub(r'\s*\(\d{3,4}[pi]\)', '', name, flags=re.IGNORECASE)
               name = re.sub(r'\s*\[[^]]*\]', '', name)
               name = re.sub(r'\s+', ' ', name)
               return name.strip().lower()
 
+          MALAYALAM_SET   = {clean_name(n) for n in APPROVED_MALAYALAM}
+          MOVED_TAMIL_SET = {clean_name(n) for n in MOVED_FROM_TAMIL}
+          TAMIL_SET       = {clean_name(n) for n in APPROVED_TAMIL}
+
+
+          def split_extinf(extinf):
+              """Return (head_without_name, display_name). Splits on last comma."""
+              idx = extinf.rfind(",")
+              if idx == -1:
+                  return extinf, ""
+              return extinf[:idx], extinf[idx + 1:].strip()
+
+
+          def channel_name(extinf):
+              return split_extinf(extinf)[1] or "Unknown"
+
+
           def download_playlist(url):
               """Download and return list of (extinf, url) pairs."""
               print(f"Downloading: {url}")
               try:
-                  response = urllib.request.urlopen(url, timeout=30)
+                  req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+                  response = urllib.request.urlopen(req, timeout=30)
                   content = response.read().decode('utf-8', errors='ignore')
                   lines = content.splitlines()
                   channels = []
@@ -94,14 +112,13 @@ jobs:
                   while i < len(lines):
                       line = lines[i].strip()
                       if line.startswith("#EXTINF"):
-                          extinf = line
                           if i + 1 < len(lines):
                               stream_url = lines[i + 1].strip()
                               if stream_url.startswith("http"):
-                                  channels.append((extinf, stream_url))
-                              i += 2
-                          else:
-                              i += 1
+                                  channels.append((line, stream_url))
+                                  i += 2
+                                  continue
+                          i += 1
                       else:
                           i += 1
                   return channels
@@ -109,24 +126,48 @@ jobs:
                   print(f"❌ Error downloading {url}: {e}")
                   return []
 
+
           def set_group_and_logo(extinf, group_name, custom_logo=None):
-              """Helper to set group and optionally logo."""
-              extinf_new = re.sub(r'group-title="[^"]*"', '', extinf)
-              extinf_new = re.sub(r'\s+', ' ', extinf_new)
+              """Rewrite #EXTINF with a group-title and (optionally) a custom logo.
+                 Produces VALID syntax: attributes appended, name preserved after the comma."""
+              head, name = split_extinf(extinf)
 
-              if custom_logo:
-                  if 'tvg-logo="' in extinf_new:
-                      extinf_new = re.sub(r'tvg-logo="[^"]*"', f'tvg-logo="{custom_logo}"', extinf_new)
+              # Strip existing group-title
+              head = re.sub(r'\s*group-title="[^"]*"', '', head)
+
+              # Swap or add logo if requested
+              if custom_logo is not None:
+                  if 'tvg-logo="' in head:
+                      head = re.sub(r'tvg-logo="[^"]*"', f'tvg-logo="{custom_logo}"', head)
                   else:
-                      extinf_new = extinf_new.replace('#EXTINF:', f'#EXTINF: tvg-logo="{custom_logo}"', 1)
+                      head = f'{head} tvg-logo="{custom_logo}"'
 
-              if 'group-title="' in extinf_new:
-                  extinf_new = re.sub(r'group-title="[^"]*"', f'group-title="{group_name}"', extinf_new)
-              else:
-                  extinf_new = extinf_new.replace('#EXTINF:', f'#EXTINF: group-title="{group_name}"', 1)
+              head = f'{head} group-title="{group_name}"'
+              head = re.sub(r'[ \t]+', ' ', head).strip()
+              return f'{head},{name}'
 
-              extinf_new = re.sub(r'\s+', ' ', extinf_new)
-              return extinf_new
+
+          def ensure_group(extinf, default_group):
+              """Only add a group-title if none exists; otherwise leave untouched."""
+              head, name = split_extinf(extinf)
+              if 'group-title="' in head:
+                  return extinf
+              head = f'{head} group-title="{default_group}"'
+              head = re.sub(r'[ \t]+', ' ', head).strip()
+              return f'{head},{name}'
+
+
+          def dedupe(channels):
+              """Drop exact (name, url) duplicates, keeping first occurrence."""
+              seen, out = set(), []
+              for extinf, url in channels:
+                  key = (channel_name(extinf).lower(), url)
+                  if key in seen:
+                      continue
+                  seen.add(key)
+                  out.append((extinf, url))
+              return out
+
 
           # ------------------------------------------------------------
           # STEP 1: Download and FILTER Malayalam
@@ -136,13 +177,11 @@ jobs:
           mal_removed = 0
 
           for extinf, url in mal_channels:
-              if "," in extinf:
-                  full_name = extinf.split(",")[-1].strip()
-              else:
-                  full_name = "Unknown"
+              full_name = channel_name(extinf)
+              cleaned   = clean_name(full_name)
 
-              if clean_name(full_name) in MALAYALAM_SET:
-                  if clean_name(full_name) == "mazhavil manorama hd":
+              if cleaned in MALAYALAM_SET:
+                  if cleaned == "mazhavil manorama hd":
                       extinf_new = set_group_and_logo(extinf, GROUP_NAME, CUSTOM_MAZHAVIL_LOGO)
                       malayalam_kept.append((extinf_new, CUSTOM_MAZHAVIL_URL))
                   else:
@@ -153,28 +192,24 @@ jobs:
 
           print(f"✅ {GROUP_NAME}: Kept {len(malayalam_kept)} channels, Removed {mal_removed} channels")
 
+
           # ------------------------------------------------------------
-          # STEP 2: Download Tamil, BUT capture moved channels for Malayalam
+          # STEP 2: Download Tamil, capture moved channels for Malayalam
           # ------------------------------------------------------------
           tam_channels = download_playlist("https://iptv-org.github.io/iptv/languages/tam.m3u")
           tamil_kept = []
           tam_removed = 0
-          moved_channels = []  # These will go to Malayalam group
+          moved_channels = []
 
           for extinf, url in tam_channels:
-              if "," in extinf:
-                  full_name = extinf.split(",")[-1].strip()
-              else:
-                  full_name = "Unknown"
+              full_name = channel_name(extinf)
+              cleaned   = clean_name(full_name)
 
-              # Check if this is one of the channels to move to Malayalam
-              if clean_name(full_name) in MOVED_TAMIL_SET:
-                  # Add to Malayalam group instead
+              if cleaned in MOVED_TAMIL_SET:
                   extinf_new = set_group_and_logo(extinf, GROUP_NAME)
                   moved_channels.append((extinf_new, url))
                   print(f"   ➕ Moved to {GROUP_NAME}: {full_name}")
-              elif clean_name(full_name) in TAMIL_SET:
-                  # Keep in Tamil group
+              elif cleaned in TAMIL_SET:
                   extinf_new = set_group_and_logo(extinf, "Tamil")
                   tamil_kept.append((extinf_new, url))
               else:
@@ -183,80 +218,58 @@ jobs:
           print(f"✅ Tamil: Kept {len(tamil_kept)} channels, Removed {tam_removed} channels")
           print(f"   ➕ Moved to Malayalam: {len(moved_channels)} channels")
 
-          # Add moved channels to Malayalam group
           malayalam_kept.extend(moved_channels)
 
-          # ------------------------------------------------------------
-          # STEP 3: Download DOMS9 - Force ALL channels into "dom9" group
-          # ------------------------------------------------------------
-          dom9_url = "https://raw.githubusercontent.com/doms9/iptv/refs/heads/default/M3U8/base.m3u8"
-          dom9_channels = download_playlist(dom9_url)
-          dom9_kept = []
 
-          for extinf, url in dom9_channels:
-              extinf_new = set_group_and_logo(extinf, "dom9")
-              dom9_kept.append((extinf_new, url))
-
+          # ------------------------------------------------------------
+          # STEP 3: dom9 (force all channels into "dom9" group)
+          # ------------------------------------------------------------
+          dom9_channels = download_playlist(
+              "https://raw.githubusercontent.com/doms9/iptv/refs/heads/default/M3U8/base.m3u8"
+          )
+          dom9_kept = [(set_group_and_logo(e, "dom9"), u) for e, u in dom9_channels]
           print(f"✅ dom9: Added {len(dom9_kept)} channels (all in 'dom9' group)")
 
-          # ------------------------------------------------------------
-          # STEP 4: Download English International Playlist (NO FILTERING)
-          # ------------------------------------------------------------
-          eng_intl_url = "https://raw.githubusercontent.com/wizakorhd/iptv/main/playlist-english-intl.m3u"
-          eng_intl_channels = download_playlist(eng_intl_url)
-          eng_intl_kept = []
-
-          for extinf, url in eng_intl_channels:
-              extinf_new = extinf
-              if 'group-title="' not in extinf_new:
-                  if 'tvg-logo="' in extinf_new:
-                      extinf_new = extinf_new.replace('tvg-logo="', 'tvg-logo="" group-title="Uncategorized"', 1)
-                  else:
-                      extinf_new = extinf_new.replace('#EXTINF:', '#EXTINF: group-title="Uncategorized"', 1)
-              eng_intl_kept.append((extinf_new, url))
-
-          print(f"✅ English International: Added {len(eng_intl_kept)} channels (no filtering)")
 
           # ------------------------------------------------------------
-          # STEP 5: Download English India Playlist (NO FILTERING)
+          # STEP 4: wizakorhd main playlist (NO filtering — preserves original groups)
           # ------------------------------------------------------------
-          eng_india_url = "https://raw.githubusercontent.com/wizakorhd/iptv/main/playlist-english-india.m3u"
-          eng_india_channels = download_playlist(eng_india_url)
-          eng_india_kept = []
+          wiz_channels = download_playlist(
+              "https://raw.githubusercontent.com/wizakorhd/iptv/main/playlist.m3u"
+          )
+          wiz_kept = [(ensure_group(e, "Uncategorized"), u) for e, u in wiz_channels]
+          print(f"✅ wizakorhd: Added {len(wiz_kept)} channels (no filtering)")
 
-          for extinf, url in eng_india_channels:
-              extinf_new = extinf
-              if 'group-title="' not in extinf_new:
-                  if 'tvg-logo="' in extinf_new:
-                      extinf_new = extinf_new.replace('tvg-logo="', 'tvg-logo="" group-title="Uncategorized"', 1)
-                  else:
-                      extinf_new = extinf_new.replace('#EXTINF:', '#EXTINF: group-title="Uncategorized"', 1)
-              eng_india_kept.append((extinf_new, url))
-
-          print(f"✅ English India: Added {len(eng_india_kept)} channels (no filtering)")
 
           # ------------------------------------------------------------
-          # STEP 6: Download Anime Playlist (NO FILTERING)
+          # STEP 5: Sanity check — abort if any source looks broken.
+          # If we abort, gh-pages is left untouched, so the last good
+          # playlist stays live.
           # ------------------------------------------------------------
-          anime_url = "https://raw.githubusercontent.com/wizakorhd/iptv/main/playlist-anime.m3u"
-          anime_channels = download_playlist(anime_url)
-          anime_kept = []
+          MIN_COUNTS = {
+              "Malayalam + Extras": (len(malayalam_kept), 10),
+              "Tamil":              (len(tamil_kept),      8),
+              "dom9":               (len(dom9_kept),       30),
+              "wizakorhd":          (len(wiz_kept),        100),
+          }
 
-          for extinf, url in anime_channels:
-              extinf_new = extinf
-              if 'group-title="' not in extinf_new:
-                  if 'tvg-logo="' in extinf_new:
-                      extinf_new = extinf_new.replace('tvg-logo="', 'tvg-logo="" group-title="Anime"', 1)
-                  else:
-                      extinf_new = extinf_new.replace('#EXTINF:', '#EXTINF: group-title="Anime"', 1)
-              anime_kept.append((extinf_new, url))
+          aborted = False
+          for label, (count, minimum) in MIN_COUNTS.items():
+              if count < minimum:
+                  print(f"❌ {label}: only {count} channels (expected ≥ {minimum}) — source likely down")
+                  aborted = True
 
-          print(f"✅ Anime: Added {len(anime_kept)} channels (no filtering)")
+          if aborted:
+              sys.exit("❌ Aborting: source(s) returned too few channels. Not publishing.")
+
 
           # ------------------------------------------------------------
-          # STEP 7: Merge and write final output.m3u
+          # STEP 6: Merge, dedupe, write output.m3u
           # ------------------------------------------------------------
-          all_final = malayalam_kept + tamil_kept + dom9_kept + eng_intl_kept + eng_india_kept + anime_kept
+          all_final = malayalam_kept + tamil_kept + dom9_kept + wiz_kept
+          before    = len(all_final)
+          all_final = dedupe(all_final)
+          dupes     = before - len(all_final)
 
           with open("output.m3u", "w", encoding="utf-8") as f:
               f.write("#EXTM3U\n")
@@ -264,13 +277,11 @@ jobs:
                   f.write(extinf + "\n")
                   f.write(url + "\n")
 
-          print(f"\n✅ FINAL: {len(all_final)} total channels in output.m3u")
+          print(f"\n✅ FINAL: {len(all_final)} total channels in output.m3u (removed {dupes} duplicates)")
           print(f"   🟢 {GROUP_NAME} (filtered + moved channels): {len(malayalam_kept)}")
-          print(f"   🔴 Tamil (filtered): {len(tamil_kept)}")
-          print(f"   🟠 dom9 (all channels): {len(dom9_kept)}")
-          print(f"   🟡 English International (no filtering): {len(eng_intl_kept)}")
-          print(f"   🟢 English India (no filtering): {len(eng_india_kept)}")
-          print(f"   🟣 Anime (no filtering): {len(anime_kept)}")
+          print(f"   🔴 Tamil (filtered):                        {len(tamil_kept)}")
+          print(f"   🟠 dom9 (all channels):                     {len(dom9_kept)}")
+          print(f"   🟣 wizakorhd (no filtering):                {len(wiz_kept)}")
           EOF
 
           python3 merge.py
@@ -279,21 +290,20 @@ jobs:
         run: |
           echo "🔍 Checking for channels without logos..."
           echo ""
-          
-          # Count channels with missing logos
-          MISSING=$(grep -c 'tvg-logo=""' output.m3u || echo "0")
-          TOTAL=$(grep -c '^#EXTINF' output.m3u || echo "0")
-          
+
+          MISSING=$(grep -c 'tvg-logo=""' output.m3u || true)
+          TOTAL=$(grep -c '^#EXTINF' output.m3u || true)
+
           echo "📊 Total channels: $TOTAL"
           echo "❌ Channels without logos: $MISSING"
           echo ""
-          
+
           if [ "$MISSING" -gt 0 ]; then
             echo "📋 Channels missing logos (first 20):"
             echo "----------------------------------------"
             grep 'tvg-logo=""' output.m3u | head -20 | sed 's/.*,//'
             echo ""
-            
+
             if [ "$MISSING" -gt 20 ]; then
               echo "... and $((MISSING - 20)) more channels missing logos"
             fi
@@ -301,10 +311,15 @@ jobs:
             echo "🎉 All channels have logos!"
           fi
 
+      - name: Stage output
+        run: |
+          mkdir -p dist
+          mv output.m3u dist/
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./
+          publish_dir: ./dist
           publish_branch: gh-pages
           keep_files: false
