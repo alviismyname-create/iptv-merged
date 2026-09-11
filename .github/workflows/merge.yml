@@ -90,6 +90,17 @@ jobs:
               return split_extinf(extinf)[1] or "Unknown"
 
 
+          def group_title(extinf):
+              head, _ = split_extinf(extinf)
+              m = re.search(r'group-title="([^"]*)"', head)
+              return m.group(1) if m else ""
+
+
+          def extinf_sort_key(extinf):
+              """Sort key: (group-title, display-name), both lowercased."""
+              return (group_title(extinf).lower(), channel_name(extinf).lower())
+
+
           def download_playlist(url):
               """Download and return list of (extinf, url) pairs."""
               print(f"Downloading: {url}")
@@ -235,7 +246,7 @@ jobs:
               (
                   "Al Jazeera English (1080p)",
                   "https://live-hls-apps-aje-fa.getaj.net/AJE/index.m3u8",
-                  "https://upload.wikimedia.org/wikipedia/en/thumb/f/f2/Aljazeera_eng.svg/512px-Aljazeera_eng.svg.png",
+                  "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/qatar/al-jazeera-english-qa.png",
               ),
               # Add more here, one tuple per channel
           ]
@@ -244,6 +255,15 @@ jobs:
               extinf = f'#EXTINF:-1 tvg-logo="{logo or ""}" group-title="{CUSTOM_GROUP}",{name}'
               wiz_kept.append((extinf, url))
               print(f"   ➕ Custom: {name} → {CUSTOM_GROUP}")
+
+
+          # ------------------------------------------------------------
+          # STEP 4c: Sort wizakorhd channels by (group, channel name) A→Z
+          # Applied AFTER custom channels are appended so Al Jazeera
+          # lands in alphabetical position within its group.
+          # ------------------------------------------------------------
+          wiz_kept.sort(key=lambda pair: extinf_sort_key(pair[0]))
+          print(f"✅ wizakorhd: Sorted {len(wiz_kept)} channels A→Z within each group")
 
 
           # ------------------------------------------------------------
