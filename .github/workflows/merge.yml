@@ -68,7 +68,6 @@ jobs:
           # CHANNELS WE INJECT OURSELVES (not sourced from iptv-org).
           # These are ALWAYS present, regardless of what the upstream
           # playlist contains. Format: (name, url, logo, group)
-          # Logo verified working — same URL iptv-org uses for this channel.
           # ------------------------------------------------------------
           INJECTED_CHANNELS = [
               (
@@ -232,7 +231,6 @@ jobs:
           for extinf, extras, url in mal_channels:
               cleaned = clean_name(channel_name(extinf))
 
-              # Skip any channel we inject ourselves, to avoid duplicates
               if cleaned in INJECTED_NAMES:
                   mal_skipped_injected += 1
                   continue
@@ -263,8 +261,6 @@ jobs:
               malayalam_kept.append((extinf, [], url))
               print(f"   ➕ Injected: {name} → {group}")
 
-          # Sort A→Z within the Malayalam group so injected channels land
-          # in their correct alphabetical position, not at the bottom.
           malayalam_kept.sort(key=lambda t: extinf_sort_key(t[0]))
 
 
@@ -308,12 +304,36 @@ jobs:
 
 
           # ------------------------------------------------------------
-          # STEP 4b: Custom channels injected into a wizakorhd group
-          # Format: (display name, stream URL, logo URL)
-          # Set logo to None if you don't have one.
+          # STEP 4b: Detect the live "English (Intl) - News (N)" group.
+          # wizakorhd embeds a channel COUNT in the group name, and that
+          # count changes as channels are added/removed. So we match by
+          # pattern rather than hardcoding a number. This keeps our
+          # custom news channels inside the SAME group as the rest of
+          # the English international news channels — no orphan group.
           # ------------------------------------------------------------
-          CUSTOM_GROUP = "English (Intl) - News (217)"
+          NEWS_GROUP_PATTERN = re.compile(r'^English \(Intl\) - News \(\d+\)$')
 
+          news_group_counts = {}
+          for extinf, _, _ in wiz_kept:
+              g = group_title(extinf)
+              if NEWS_GROUP_PATTERN.match(g):
+                  news_group_counts[g] = news_group_counts.get(g, 0) + 1
+
+          if news_group_counts:
+              # Pick the group with the most channels, in case multiple exist.
+              CUSTOM_GROUP = max(news_group_counts, key=news_group_counts.get)
+              print(f"🎯 Detected news group: '{CUSTOM_GROUP}' "
+                    f"({news_group_counts[CUSTOM_GROUP]} channels)")
+          else:
+              CUSTOM_GROUP = "English (Intl) - News"
+              print(f"⚠️  Could not detect news group in wizakorhd — "
+                    f"using fallback: '{CUSTOM_GROUP}'")
+
+
+          # ------------------------------------------------------------
+          # STEP 4c: Custom channels injected into the detected news group.
+          # Format: (display name, stream URL, logo URL)
+          # ------------------------------------------------------------
           CUSTOM_CHANNELS = [
               (
                   "Al Jazeera English (1080p)",
@@ -334,9 +354,9 @@ jobs:
 
 
           # ------------------------------------------------------------
-          # STEP 4c: Sort wizakorhd channels by (group, channel name) A→Z
-          # Applied AFTER custom channels are appended so Al Jazeera
-          # lands in alphabetical position within its group.
+          # STEP 4d: Sort wizakorhd channels by (group, channel name) A→Z.
+          # Applied AFTER customs are appended so Al Jazeera slots into
+          # its alphabetical position inside the news group.
           # ------------------------------------------------------------
           wiz_kept.sort(key=lambda t: extinf_sort_key(t[0]))
           print(f"✅ wizakorhd: Sorted {len(wiz_kept)} channels A→Z within each group")
@@ -344,8 +364,6 @@ jobs:
 
           # ------------------------------------------------------------
           # STEP 5: Sanity check — abort if any source looks broken.
-          # If we abort, gh-pages is left untouched, so the last good
-          # playlist stays live.
           # ------------------------------------------------------------
           MIN_COUNTS = {
               "Malayalam": (len(malayalam_kept), 10),
@@ -385,6 +403,7 @@ jobs:
           print(f"   🔴 Tamil (filtered):                 {len(tamil_kept)}")
           print(f"   🟠 dom9 (all channels):              {len(dom9_kept)}")
           print(f"   🟣 wizakorhd (no filtering):         {len(wiz_kept)}")
+          print(f"   📰 News group (detected):            '{CUSTOM_GROUP}'")
           EOF
 
           python3 merge.py
