@@ -8,9 +8,14 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: merge-iptv
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -56,13 +61,26 @@ jobs:
               "Zee Tamil HD"
           ]
 
-          # ------------------------------------------------------------
-          # CUSTOM STREAM LINK & LOGO FOR MAZHAVIL MANORAMA HD
-          # ------------------------------------------------------------
-          CUSTOM_MAZHAVIL_URL  = "https://mumt07.tangotv.in/zHjX9OFlMAZHAVILMANORAMAHD/tracks-v1a1/mono.m3u8"
-          CUSTOM_MAZHAVIL_LOGO = "https://i.imgur.com/xCHQrH0.png"
           GROUP_NAME = "Malayalam"
           USER_AGENT = "Mozilla/5.0 (compatible; IPTV-Merger/1.0)"
+
+          # ------------------------------------------------------------
+          # CHANNELS WE INJECT OURSELVES (not sourced from iptv-org).
+          # These are ALWAYS present, regardless of what the upstream
+          # playlist contains. Format: (name, url, logo, group)
+          # Logo verified working — same URL iptv-org uses for this channel.
+          # ------------------------------------------------------------
+          INJECTED_CHANNELS = [
+              (
+                  "Mazhavil Manorama HD",
+                  "https://mumt07.tangotv.in/zHjX9OFlMAZHAVILMANORAMAHD/tracks-v1a1/mono.m3u8",
+                  "https://i.imgur.com/xCHQrH0.png",
+                  "Malayalam",
+              ),
+          ]
+
+          # Names that must NOT be pulled from iptv-org (we inject our own copy).
+          INJECTED_NAMES = {n.lower() for n, _, _, _ in INJECTED_CHANNELS}
 
           # ------------------------------------------------------------
           # Helpers
@@ -79,11 +97,16 @@ jobs:
 
 
           def split_extinf(extinf):
-              """Return (head_without_name, display_name). Splits on last comma."""
-              idx = extinf.rfind(",")
-              if idx == -1:
-                  return extinf, ""
-              return extinf[:idx], extinf[idx + 1:].strip()
+              """Return (head_without_name, display_name).
+                 Splits on the FIRST comma that is outside quotes — so channel
+                 names containing commas (e.g. "News, Live") stay intact."""
+              in_q = False
+              for idx, ch in enumerate(extinf):
+                  if ch == '"':
+                      in_q = not in_q
+                  elif ch == ',' and not in_q:
+                      return extinf[:idx], extinf[idx + 1:].strip()
+              return extinf, ""
 
 
           def channel_name(extinf):
@@ -102,7 +125,10 @@ jobs:
 
 
           def download_playlist(url):
-              """Download and return list of (extinf, url) pairs."""
+              """Download and return list of (extinf, extras, url) tuples.
+                 `extras` holds any #EXTVLCOPT / #KODIPROP / #EXTGRP lines that
+                 sit between the #EXTINF and the URL — they are preserved so
+                 players that need user-agent / referer headers still work."""
               print(f"Downloading: {url}")
               try:
                   req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
@@ -113,16 +139,26 @@ jobs:
                   i = 0
                   while i < len(lines):
                       line = lines[i].strip()
-                      if line.startswith("#EXTINF"):
-                          if i + 1 < len(lines):
-                              stream_url = lines[i + 1].strip()
-                              if stream_url.startswith("http"):
-                                  channels.append((line, stream_url))
-                                  i += 2
-                                  continue
+                      if not line.startswith("#EXTINF"):
                           i += 1
+                          continue
+
+                      extinf = line
+                      extras = []
+                      j = i + 1
+                      while j < len(lines):
+                          nxt = lines[j].strip()
+                          if nxt.startswith("#") and not nxt.startswith("#EXTINF"):
+                              extras.append(nxt)
+                              j += 1
+                          else:
+                              break
+
+                      if j < len(lines) and lines[j].strip().startswith("http"):
+                          channels.append((extinf, extras, lines[j].strip()))
+                          i = j + 1
                       else:
-                          i += 1
+                          i = j
                   return channels
               except Exception as e:
                   print(f"❌ Error downloading {url}: {e}")
@@ -133,11 +169,11 @@ jobs:
               """Rewrite #EXTINF with a group-title and (optionally) a custom logo.
                  Produces VALID syntax: attributes appended, name preserved after the comma."""
               head, name = split_extinf(extinf)
+              if not name:
+                  name = "Unknown"
 
-              # Strip existing group-title
               head = re.sub(r'\s*group-title="[^"]*"', '', head)
 
-              # Swap or add logo if requested
               if custom_logo is not None:
                   if 'tvg-logo="' in head:
                       head = re.sub(r'tvg-logo="[^"]*"', f'tvg-logo="{custom_logo}"', head)
@@ -152,6 +188,8 @@ jobs:
           def ensure_group(extinf, default_group):
               """Only add a group-title if none exists; otherwise leave untouched."""
               head, name = split_extinf(extinf)
+              if not name:
+                  name = "Unknown"
               if 'group-title="' in head:
                   return extinf
               head = f'{head} group-title="{default_group}"'
@@ -162,13 +200,25 @@ jobs:
           def dedupe(channels):
               """Drop exact (name, url) duplicates, keeping first occurrence."""
               seen, out = set(), []
-              for extinf, url in channels:
+              for extinf, extras, url in channels:
                   key = (channel_name(extinf).lower(), url)
                   if key in seen:
                       continue
                   seen.add(key)
-                  out.append((extinf, url))
+                  out.append((extinf, extras, url))
               return out
+
+
+          def head_request_ok(url):
+              """Return True if a HEAD request to url succeeds (2xx/3xx)."""
+              try:
+                  req = urllib.request.Request(url, method="HEAD",
+                                               headers={"User-Agent": USER_AGENT})
+                  urllib.request.urlopen(req, timeout=10)
+                  return True
+              except Exception as e:
+                  print(f"      ⚠️  HEAD failed: {e}")
+                  return False
 
 
           # ------------------------------------------------------------
@@ -177,22 +227,45 @@ jobs:
           mal_channels = download_playlist("https://iptv-org.github.io/iptv/languages/mal.m3u")
           malayalam_kept = []
           mal_removed = 0
+          mal_skipped_injected = 0
 
-          for extinf, url in mal_channels:
-              full_name = channel_name(extinf)
-              cleaned   = clean_name(full_name)
+          for extinf, extras, url in mal_channels:
+              cleaned = clean_name(channel_name(extinf))
+
+              # Skip any channel we inject ourselves, to avoid duplicates
+              if cleaned in INJECTED_NAMES:
+                  mal_skipped_injected += 1
+                  continue
 
               if cleaned in MALAYALAM_SET:
-                  if cleaned == "mazhavil manorama hd":
-                      extinf_new = set_group_and_logo(extinf, GROUP_NAME, CUSTOM_MAZHAVIL_LOGO)
-                      malayalam_kept.append((extinf_new, CUSTOM_MAZHAVIL_URL))
-                  else:
-                      extinf_new = set_group_and_logo(extinf, GROUP_NAME)
-                      malayalam_kept.append((extinf_new, url))
+                  extinf_new = set_group_and_logo(extinf, GROUP_NAME)
+                  malayalam_kept.append((extinf_new, extras, url))
               else:
                   mal_removed += 1
 
           print(f"✅ {GROUP_NAME}: Kept {len(malayalam_kept)} channels, Removed {mal_removed} channels")
+          if mal_skipped_injected:
+              print(f"   ⏭️  Skipped {mal_skipped_injected} channel(s) that we inject ourselves")
+
+
+          # ------------------------------------------------------------
+          # STEP 1b: Inject our own Malayalam channels (always present,
+          # independent of what iptv-org happens to carry).
+          # ------------------------------------------------------------
+          for name, url, logo, group in INJECTED_CHANNELS:
+              if group != GROUP_NAME:
+                  continue
+              if logo:
+                  print(f"   🔎 Verifying logo for '{name}': {logo}")
+                  if not head_request_ok(logo):
+                      print(f"   ⚠️  LOGO UNREACHABLE for '{name}' — player will show blank")
+              extinf = f'#EXTINF:-1 tvg-logo="{logo or ""}" group-title="{group}",{name}'
+              malayalam_kept.append((extinf, [], url))
+              print(f"   ➕ Injected: {name} → {group}")
+
+          # Sort A→Z within the Malayalam group so injected channels land
+          # in their correct alphabetical position, not at the bottom.
+          malayalam_kept.sort(key=lambda t: extinf_sort_key(t[0]))
 
 
           # ------------------------------------------------------------
@@ -202,13 +275,12 @@ jobs:
           tamil_kept = []
           tam_removed = 0
 
-          for extinf, url in tam_channels:
-              full_name = channel_name(extinf)
-              cleaned   = clean_name(full_name)
+          for extinf, extras, url in tam_channels:
+              cleaned = clean_name(channel_name(extinf))
 
               if cleaned in TAMIL_SET:
                   extinf_new = set_group_and_logo(extinf, "Tamil")
-                  tamil_kept.append((extinf_new, url))
+                  tamil_kept.append((extinf_new, extras, url))
               else:
                   tam_removed += 1
 
@@ -221,7 +293,7 @@ jobs:
           dom9_channels = download_playlist(
               "https://raw.githubusercontent.com/doms9/iptv/refs/heads/default/M3U8/base.m3u8"
           )
-          dom9_kept = [(set_group_and_logo(e, "dom9"), u) for e, u in dom9_channels]
+          dom9_kept = [(set_group_and_logo(e, "dom9"), x, u) for e, x, u in dom9_channels]
           print(f"✅ dom9: Added {len(dom9_kept)} channels (all in 'dom9' group)")
 
 
@@ -231,7 +303,7 @@ jobs:
           wiz_channels = download_playlist(
               "https://raw.githubusercontent.com/wizakorhd/iptv/main/playlist.m3u"
           )
-          wiz_kept = [(ensure_group(e, "Uncategorized"), u) for e, u in wiz_channels]
+          wiz_kept = [(ensure_group(e, "Uncategorized"), x, u) for e, x, u in wiz_channels]
           print(f"✅ wizakorhd: Added {len(wiz_kept)} channels (no filtering)")
 
 
@@ -246,14 +318,18 @@ jobs:
               (
                   "Al Jazeera English (1080p)",
                   "https://live-hls-apps-aje-fa.getaj.net/AJE/index.m3u8",
-                  "https://raw.githubusercontent.com/tv-logo/tv-logos/main/countries/qatar/al-jazeera-english-qa.png",
+                  "https://i.imgur.com/7bRVpnu.png",
               ),
               # Add more here, one tuple per channel
           ]
 
           for name, url, logo in CUSTOM_CHANNELS:
+              if logo:
+                  print(f"   🔎 Verifying logo for '{name}': {logo}")
+                  if not head_request_ok(logo):
+                      print(f"   ⚠️  LOGO UNREACHABLE for '{name}' — player will show blank")
               extinf = f'#EXTINF:-1 tvg-logo="{logo or ""}" group-title="{CUSTOM_GROUP}",{name}'
-              wiz_kept.append((extinf, url))
+              wiz_kept.append((extinf, [], url))
               print(f"   ➕ Custom: {name} → {CUSTOM_GROUP}")
 
 
@@ -262,7 +338,7 @@ jobs:
           # Applied AFTER custom channels are appended so Al Jazeera
           # lands in alphabetical position within its group.
           # ------------------------------------------------------------
-          wiz_kept.sort(key=lambda pair: extinf_sort_key(pair[0]))
+          wiz_kept.sort(key=lambda t: extinf_sort_key(t[0]))
           print(f"✅ wizakorhd: Sorted {len(wiz_kept)} channels A→Z within each group")
 
 
@@ -297,16 +373,18 @@ jobs:
           dupes     = before - len(all_final)
 
           with open("output.m3u", "w", encoding="utf-8") as f:
-              f.write("#EXTM3U\n")
-              for extinf, url in all_final:
+              f.write('#EXTM3U x-tvg-url="https://iptv-org.github.io/epg/index.xml"\n')
+              for extinf, extras, url in all_final:
                   f.write(extinf + "\n")
+                  for x in extras:
+                      f.write(x + "\n")
                   f.write(url + "\n")
 
           print(f"\n✅ FINAL: {len(all_final)} total channels in output.m3u (removed {dupes} duplicates)")
-          print(f"   🟢 {GROUP_NAME} (filtered):     {len(malayalam_kept)}")
-          print(f"   🔴 Tamil (filtered):           {len(tamil_kept)}")
-          print(f"   🟠 dom9 (all channels):        {len(dom9_kept)}")
-          print(f"   🟣 wizakorhd (no filtering):   {len(wiz_kept)}")
+          print(f"   🟢 {GROUP_NAME} (filtered + injected): {len(malayalam_kept)}")
+          print(f"   🔴 Tamil (filtered):                 {len(tamil_kept)}")
+          print(f"   🟠 dom9 (all channels):              {len(dom9_kept)}")
+          print(f"   🟣 wizakorhd (no filtering):         {len(wiz_kept)}")
           EOF
 
           python3 merge.py
@@ -316,17 +394,17 @@ jobs:
           echo "🔍 Checking for channels without logos..."
           echo ""
 
-          MISSING=$(grep -c 'tvg-logo=""' output.m3u || true)
-          TOTAL=$(grep -c '^#EXTINF' output.m3u || true)
+          TOTAL=$(grep -c '^#EXTINF' output.m3u 2>/dev/null || echo 0)
+          MISSING=$(grep '^#EXTINF' output.m3u 2>/dev/null | grep -vc 'tvg-logo="http' || echo 0)
 
           echo "📊 Total channels: $TOTAL"
-          echo "❌ Channels without logos: $MISSING"
+          echo "❌ Channels without a usable logo URL: $MISSING"
           echo ""
 
           if [ "$MISSING" -gt 0 ]; then
             echo "📋 Channels missing logos (first 20):"
             echo "----------------------------------------"
-            grep 'tvg-logo=""' output.m3u | head -20 | sed 's/.*,//'
+            grep '^#EXTINF' output.m3u | grep -v 'tvg-logo="http' | head -20 | sed 's/.*,//'
             echo ""
 
             if [ "$MISSING" -gt 20 ]; then
@@ -342,7 +420,7 @@ jobs:
           mv output.m3u dist/
 
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
